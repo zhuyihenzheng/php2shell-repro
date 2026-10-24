@@ -1,0 +1,7 @@
+[*] php          build-patched/php-8.5.12/sapi/cli/php
+[*] server       http://127.0.0.1:41871/  memory_limit=16M
+[*] req1         seeded session: 4194317 bytes (1048576 elements)
+[*] req1         HTTP/1.0 500 Internal Server Error  oom=True  alive=True
+[*] req2         seeded session: x|i:1;
+[*] req2         HTTP/1.1 200 OK  exit=None  asan=False
+[-] worker survived req2 (patched build?)

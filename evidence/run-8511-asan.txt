@@ -1,0 +1,57 @@
+[*] php          build-asan/php-8.5.11/sapi/cli/php
+[*] server       http://127.0.0.1:35147/  memory_limit=16M
+[*] req1         seeded session: 4194317 bytes (1048576 elements)
+[*] req1         HTTP/1.0 500 Internal Server Error  oom=True  alive=True
+[*] req2         seeded session: x|i:1;
+[*] req2         <no response>  exit=-6  asan=True
+[+] worker crashed: BG(unserialize) reused the freed php_unserialize_data
+
+=== server log ===
+[Sat Oct 24 16:00:52 2026] PHP 8.5.11 Development Server (http://127.0.0.1:35147) started
+[Sat Oct 24 16:00:52 2026] 127.0.0.1:44842 Accepted
+[Sat Oct 24 16:00:52 2026] 127.0.0.1:44842 Closed without sending a request; it was probably just an unused speculative preconnection
+[Sat Oct 24 16:00:52 2026] 127.0.0.1:44842 Closing
+[Sat Oct 24 16:00:52 2026] 127.0.0.1:44858 Accepted
+[Sat Oct 24 16:00:52 2026] PHP Fatal error:  Allowed memory size of 16777216 bytes exhausted at /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/Zend/zend_hash.c:225 (tried to allocate 41943040 bytes) in Unknown on line 0
+Stack trace:
+#0 {main}
+[Sat Oct 24 16:00:52 2026] PHP Warning:  PHP Request Startup: Failed to decode session object. Session has been destroyed in Unknown on line 0
+[Sat Oct 24 16:00:53 2026] 127.0.0.1:44858 Closing
+[Sat Oct 24 16:00:53 2026] 127.0.0.1:44870 Accepted
+AddressSanitizer:DEADLYSIGNAL
+=================================================================
+==395206==ERROR: AddressSanitizer: SEGV on unknown address 0x00000000013a (pc 0x64f4a2238499 bp 0x7fff71307ad0 sp 0x7fff71307ab0 T0)
+==395206==The signal is caused by a READ memory access.
+==395206==Hint: address points to the zero page.
+    #0 0x64f4a2238499 in tmp_var /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/ext/standard/var_unserializer.c:168
+    #1 0x64f4a2238825 in var_tmp_var /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/ext/standard/var_unserializer.c:190
+    #2 0x64f4a1f7050b in ps_srlzr_decode_php /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/ext/session/session.c:1123
+    #3 0x64f4a1f6b55e in php_session_decode /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/ext/session/session.c:294
+    #4 0x64f4a1f6c560 in php_session_initialize /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/ext/session/session.c:514
+    #5 0x64f4a1f7ff43 in php_session_rfc1867_cleanup /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/ext/session/session.c:3168
+    #6 0x64f4a1f81297 in php_session_rfc1867_callback /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/ext/session/session.c:3331
+    #7 0x64f4a231614f in rfc1867_post_handler /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/main/rfc1867.c:1273
+    #8 0x64f4a23178d6 in sapi_handle_post /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/main/SAPI.c:164
+    #9 0x64f4a230a459 in php_default_treat_data /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/main/php_variables.c:498
+    #10 0x64f4a1a86dbb in mbstr_treat_data /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/ext/mbstring/mb_gpc.c:45
+    #11 0x64f4a230cb05 in php_auto_globals_create_post /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/main/php_variables.c:821
+    #12 0x64f4a25254ce in zend_activate_auto_globals /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/Zend/zend_compile.c:2025
+    #13 0x64f4a230c83d in php_hash_environment /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/main/php_variables.c:794
+    #14 0x64f4a22e40e3 in php_request_startup /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/main/main.c:1942
+    #15 0x64f4a28cf633 in php_cli_server_request_startup /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php_cli_server.c:2235
+    #16 0x64f4a28cfff4 in php_cli_server_dispatch /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php_cli_server.c:2311
+    #17 0x64f4a28d1c2a in php_cli_server_recv_event_read_request /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php_cli_server.c:2662
+    #18 0x64f4a28d275e in php_cli_server_do_event_for_each_fd_callback /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php_cli_server.c:2749
+    #19 0x64f4a28c6dd9 in php_cli_server_poller_iter_on_active /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php_cli_server.c:935
+    #20 0x64f4a28d296f in php_cli_server_do_event_for_each_fd /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php_cli_server.c:2769
+    #21 0x64f4a28d2b50 in php_cli_server_do_event_loop /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php_cli_server.c:2781
+    #22 0x64f4a28d33d2 in do_cli_server /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php_cli_server.c:2913
+    #23 0x64f4a28bb948 in main /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php_cli.c:1377
+    #24 0x786edb1ea1c9 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:58
+    #25 0x786edb1ea28a in __libc_start_main_impl ../csu/libc-start.c:360
+    #26 0x64f4a1603d54 in _start (/home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/sapi/cli/php+0x603d54) (BuildId: 0940f4ad9c85fc2affafbd423487e3fd22b50b33)
+
+AddressSanitizer can not provide additional info.
+SUMMARY: AddressSanitizer: SEGV /home/hatch/workspace/php2shell/poc-109619/build-asan/php-8.5.11/ext/standard/var_unserializer.c:168 in tmp_var
+==395206==ABORTING
+

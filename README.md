@@ -39,6 +39,12 @@ python3 repro/repro_uaf.py --php build-env/build/php-8.5.11/sapi/cli/php
 python3 repro/repro_uaf.py --php build-env/build-patched/php-8.5.12/sapi/cli/php
 ```
 
+> **复现前提（请先读）**：脚本通过向 `session.save_path` **预置一个大 session 文件**
+> 来触发解码阶段 OOM——这是实验室捷径，用于隔离"启动顺序缺陷"本身；它不回答
+> "真实攻击者如何让目标产生大 session"（该问题与 109618 的 multipart 耗尽策略等
+> 另行讨论，见报告 §3.2、§4.2）。判定标准、每组实验的重复次数与"补丁有效"的
+> 覆盖范围见报告 §5.6；四组实验的原始日志在本仓库 `evidence/` 目录。
+
 ## 实测结果
 
 脆弱版 PHP 8.5.11：第二个请求使 worker 以 **SIGSEGV** 崩溃，确定性复现：

@@ -1,0 +1,36 @@
+--- a/ext/session/session.c
++++ b/ext/session/session.c
+@@ -157,6 +157,7 @@
+ /* Dispatched by RSHUTDOWN and by php_session_destroy */
+ static void php_rshutdown_session_globals(void)
+ {
++	fprintf(stderr, "[DBG] rshutdown_session_globals: PS(id)=%p\n", (void*)PS(id));
+ 	/* Do NOT destroy PS(mod_user_names) here! */
+ 	if (!Z_ISUNDEF(PS(http_session_vars))) {
+ 		zval_ptr_dtor(&PS(http_session_vars));
+@@ -440,6 +441,8 @@
+ 		return FAILURE;
+ 	}
+ 
++	fprintf(stderr, "[DBG] initialize entry: PS(id)=%p send_cookie=%d\n", (void*)PS(id), (int)PS(send_cookie));
++	if (PS(id)) { fprintf(stderr, "[DBG]   stale/fresh id len=%zu val0=%02x\n", ZSTR_LEN(PS(id)), (unsigned char)ZSTR_VAL(PS(id))[0]); }
+ 	/* Open session handler first */
+ 	if (PS(mod)->s_open(&PS(mod_data), ZSTR_VAL(PS(save_path)), ZSTR_VAL(PS(session_name))) == FAILURE
+ 		/* || PS(mod_data) == NULL */ /* FIXME: open must set valid PS(mod_data) with success */
+@@ -1372,6 +1375,7 @@
+ 
+ static zend_result php_session_send_cookie(void)
+ {
++	fprintf(stderr, "[DBG] send_cookie: PS(id)=%p len=%zu\n", (void*)PS(id), PS(id) ? ZSTR_LEN(PS(id)) : 0);
+ 	smart_str ncookie = {0};
+ 	zend_string *date_fmt = NULL;
+ 	zend_string *e_id;
+@@ -1602,6 +1606,8 @@
+ 		return FAILURE;
+ 	}
+ 
++	fprintf(stderr, "[DBG] reset_id: PS(id)=%p use_cookies=%d send_cookie=%d\n", (void*)PS(id), (int)PS(use_cookies), (int)PS(send_cookie));
++	if (PS(id)) { fprintf(stderr, "[DBG]   reset_id id len=%zu\n", ZSTR_LEN(PS(id))); }
+ 	if (PS(use_cookies) && PS(send_cookie)) {
+ 		zend_result cookies_sent = php_session_send_cookie();
+ 		if (UNEXPECTED(cookies_sent == FAILURE)) {

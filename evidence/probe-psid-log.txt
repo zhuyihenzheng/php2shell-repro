@@ -1,0 +1,24 @@
+# Instrumented PHP 8.5.11 (session.c probes), sequence: req1 = crash-repro producer
+# (huge session -> OOM in decode), req2 = multipart with PHP_SESSION_UPLOAD_PROGRESS
+# field but NO file part (so PS(id) is never overwritten by FILE_START in req2)
+
+== req1: HTTP/1.0 500 Internal Server Error, worker alive ==
+[DBG] initialize entry: PS(id)=0x7cc87ce63000 send_cookie=0
+[DBG]   stale/fresh id len=32 val0=64
+[DBG] reset_id: PS(id)=0x7cc87ce63000 use_cookies=1 send_cookie=0
+[DBG]   reset_id id len=32
+PHP Fatal error: Allowed memory size of 16777216 bytes exhausted (tried to allocate 41943040 bytes)
+[DBG] rshutdown_session_globals: PS(id)=0x7cc87ce63000
+
+== req2: HTTP/1.1 200 OK, worker alive ==
+[DBG] initialize entry: PS(id)=(nil) send_cookie=0
+[DBG] reset_id: PS(id)=0x7cc87ce63080 use_cookies=1 send_cookie=1
+[DBG]   reset_id id len=32
+[DBG] send_cookie: PS(id)=0x7cc87ce63080 len=32
+[DBG] rshutdown_session_globals: PS(id)=0x7cc87ce63080
+[DBG] rshutdown_session_globals: PS(id)=(nil)
+
+=> req2 response header: Set-Cookie: PHPSESSID=79bf962a81baa2b546eeb35b11012467; path=/
+=> Reading: req1's shutdown DID run php_rshutdown_session_globals and released
+   PS(id) (req2 sees NULL and creates a fresh id). In php -S, PS(id) does NOT
+   dangle across requests with this producer, unlike BG(unserialize).

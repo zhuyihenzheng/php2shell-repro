@@ -12,7 +12,8 @@
 | 利用条件 | **无需鉴权、无需用户交互**，仅需能向目标发送 HTTP 请求；以 PHP worker 进程权限执行 |
 | 发现方 | Calif、Wiz Research、OpenAI 三方独立发现（AI 辅助审计，含 OpenAI "Patch the Planet" 项目） |
 | 在野情况 | Amazon 威胁情报称其蜜罐在 **10 月 17 日**（公开披露前）已记录到利用尝试；Zscaler 称披露 48 小时内观测到 1,156 次尝试 / 156 个 IP |
-| 本报告复现结论 | ✅ 已在 PHP **8.5.11** 与 **8.4.26** 上确定性复现未授权崩溃原语（两请求触发 worker SIGSEGV）；✅ 已在修复版 **8.5.12** 上验证补丁有效；完整 RCE 链未武器化复现（原因见第 6 节） |
+| 本报告复现结论 | ✅ 已在 PHP **8.5.11** 与 **8.4.26** 上确定性复现未授权崩溃原语（两请求触发 worker SIGSEGV）；✅ 已在修复版 **8.5.12** 上验证补丁对本实例有效（判定标准、重复次数与覆盖范围见 §5.6）；完整 RCE 链未武器化复现（原因见第 6 节） |
+| 复现前提（重要） | 崩溃复现通过**向 `session.save_path` 预置大 session 文件**来触发解码阶段 OOM，这是实验室捷径：它把"启动顺序缺陷"本身与"攻击者如何让目标产生大 session"两个问题解耦（展开见 §4.2）。内存披露变体的核查结论见第 10 节 |
 
 ---
 
@@ -49,7 +50,7 @@
 | **php-cgi** | 官方公告点名"所有提供 Web 请求的安装均有风险" | 同左 |
 | **CLI / 内置服务器 `php -S`** | 官方未点名纯 CLI | 本报告用作**本地复现载体**（单 worker 保证两请求落同一进程），不代表官方对其生产风险的定级 |
 
-两 CVE 的共同硬约束：producer 与 consumer 两个请求**必须命中同一 worker**；worker 越多成功率越低，但条件不消失。
+关于"同一 worker"的适用范围（避免过度概括）：**跨请求型实例**——即 CVE-2026-109619 的全部已确认路径与 CVE-2026-109618 的部分跨请求变体——要求 producer 与 consumer 两个请求**命中同一 worker**，worker 越多成功率越低但条件不消失；而 CVE-2026-109618 的核心情形是**单请求内** OOM 后 shutdown 直接消费半初始化状态，不依赖第二个请求。本报告复现的是 109619 的跨请求路径，故实验中以单 worker 保证两请求同进程。
 
 ## 3. 漏洞原理
 
@@ -177,7 +178,13 @@ python3 poc/repro_uaf.py --php build-patched/php-8.5.12/sapi/cli/php
 | 脆弱版（普通构建） | 8.5.11 | 500，OOM，worker 存活 | 无响应，**SIGSEGV (-11)** | ✅ UAF 复现 |
 | 脆弱版（ASan 构建） | 8.5.11 | 500，OOM，worker 存活 | ASan 报告 SEGV @ `tmp_var`，abort (-6) | ✅ 崩溃栈确认 |
 | 脆弱版（跨分支） | 8.4.26 | 500，OOM，worker 存活 | 无响应，**SIGSEGV (-11)** | ✅ 跨分支存在 |
-| 修复版对照 | 8.5.12 | 500，OOM，worker 存活 | **200 OK**，worker 存活 | ✅ 补丁有效 |
+| 修复版对照 | 8.5.12 | 500，OOM，worker 存活 | **200 OK**，worker 存活 | ✅ 补丁对本实例有效 |
+
+### 5.6 判定标准、重复次数与结论范围
+
+- **判定标准**：崩溃以 worker 进程被信号终止为准（普通构建 SIGSEGV / 退出码 -11；ASan 构建为 ASan 报告后 abort / -6）；复现脚本以退出码 0 表示"复现成功"、1 表示"worker 存活"（脚本逻辑未作改动，与上游仓库一致）。
+- **重复次数**：8.5.11 普通构建运行 3 次、8.4.26 运行 2 次、8.5.11 ASan 构建运行 2 次（含变体矩阵中的 1 次）、8.5.12 运行 2 次，各组结果均一致；原始输出见 `evidence/` 目录（公开仓库版位于仓库根目录 `evidence/`，文件名与 §12 清单一致）。
+- **"补丁有效"的范围**：对照实验只证明 8.5.12 的修复对**本节复现的 session upload-progress 实例**有效；CVE-2026-109618 的 multipart-OOM 路径、8.5 的 fatal-backtrace、OPcache 等其他 consumer 未在本实验中逐一回归，补丁的整体覆盖依据源码分析（第 7 节）与官方公告，不由本对照实验单独背书。
 
 ## 6. 从崩溃到 RCE 的差距（重要说明）
 
@@ -300,22 +307,27 @@ RCE 的初始权限是 Web 服务用户，并非 root。真实入侵中向最高
 
 ## 12. 本次复现材料清单
 
+以下路径均相对于本仓库根目录（早期版本曾声称包含而未上传的材料，已于本次修订补齐）：
+
 | 文件 | 说明 |
 |---|---|
-| `PHP2Shell复现报告.md` | 本报告 |
-| `../assets/shot1-repro-8511-crash.png` | 图 1：8.5.11 崩溃复现终端截图 |
-| `../assets/shot2-oom-server-log.png` | 图 2：请求 1 的 OOM 服务端日志 |
-| `../assets/shot3-asan-trace.png` | 图 3：ASan 崩溃调用栈 |
-| `../assets/shot4-compare-8426-8512.png` | 图 4：8.4.26 崩溃 vs 8.5.12 修复对照 |
-| `../assets/shot5-fix-8512.png` | 图 5：8.5.12 修复代码 |
-| `../assets/shot6-psid-probe.png` | 图 6：PS(id) 生命周期探针日志（第 10 节） |
-| `evidence/run-8511-normal.txt` / `run-8511-asan.txt` / `run-8426.txt` / `run-8512-patched.txt` | 四次实验的原始输出（含完整服务端日志与 ASan 报告） |
+| `docs/REPORT.md` | 本报告 |
+| `assets/shot1-repro-8511-crash.png` | 图 1：8.5.11 崩溃复现终端截图 |
+| `assets/shot2-oom-server-log.png` | 图 2：请求 1 的 OOM 服务端日志 |
+| `assets/shot3-asan-trace.png` | 图 3：ASan 崩溃调用栈 |
+| `assets/shot4-compare-8426-8512.png` | 图 4：8.4.26 崩溃 vs 8.5.12 修复对照 |
+| `assets/shot5-fix-8512.png` | 图 5：8.5.12 修复代码 |
+| `assets/shot6-psid-probe.png` | 图 6：PS(id) 生命周期探针日志（第 10 节） |
+| `assets/diagram-mechanism.png` | 两请求 UAF 时序图 |
+| `evidence/run-8511-normal.txt` / `run-8511-asan.txt` / `run-8426.txt` / `run-8512-patched.txt` | 四组实验的原始输出（含完整服务端日志与 ASan 报告） |
 | `evidence/probe-psid-log.txt` | 第 10 节探针实验的完整日志（含结论注释） |
-| `leak_hunt.py` / `leak_dbg.py` | 第 10 节的变体矩阵与探针实验驱动脚本 |
-| `poc-109619/` | 公开复现仓库（含 `poc/repro_uaf.py`、`build.sh`、`docs/ANALYSIS.md`） |
-| `php-8.4.26/`、`php-8.5.11/`、`php-8.5.12/` | 三个版本的官方源码（用于编译与补丁核对） |
+| `tools/leak_hunt.py` / `tools/leak_dbg.py` | 第 10 节的变体矩阵与探针实验驱动脚本 |
+| `tools/session.c.dbg.patch` | 第 10 节的插桩补丁：对 PHP 8.5.11 `ext/session/session.c` 的四处 `[DBG]` 打印（`patch -p1` 可应用），探针结论可由此复核 |
+| `repro/repro_uaf.py` | 两请求复现脚本（源自上游公开仓库，未作逻辑修改） |
+| `site/` | 模拟 PHP 网站（首页 + 上传页） |
+| 上游仓库 santihabib/CVE-2026-109619 | `build.sh`、根因分析 `docs/ANALYSIS.md` 与上游 ASan 记录（注：上游记录不替代本报告 `evidence/` 中的自有实验日志） |
 
-> 截图中的终端图由本地脚本把**真实命令输出**渲染而成，原始文本见 `evidence/` 目录，可逐行核对。
+> 截图中的终端图由脚本把**真实命令输出**渲染而成，原始文本见 `evidence/` 目录，可逐行核对。
 
 ## 13. 参考来源
 
